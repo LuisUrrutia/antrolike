@@ -3,7 +3,7 @@ import validators
 import requests
 from bs4 import BeautifulSoup
 import re
-from classes import Forum
+from classes.Forum import Forum
 import json
 
 class URLError(Exception):
@@ -91,10 +91,11 @@ class Xenforo(object):
         forum_objects = []
         for link in links:
             l = link.get('href')
-            all_links.append(l)
-            if forum_link.match(l) and l not in all_links:
-                f = Forum(name=link.string, url=l)
+            if l is not None and forum_link.match(l) and l not in all_links:
+                name = link.find("span").string
+                f = Forum(name=name, url="{0}/{1}".format(self.base_url, l))
                 forum_objects.append(f)
+            all_links.append(l)
         return forum_objects
 
     def get_token(self):
