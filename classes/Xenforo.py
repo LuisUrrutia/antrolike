@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from classes.Forum import Forum
+from classes.Thread import Thread
 import json
 
 class URLError(Exception):
@@ -77,6 +78,49 @@ class Xenforo(object):
         req = s.post("{0}/login/login".format(self.base_url), data=data)
         if req.status_code != 200 or req.url != self.base_url:
             raise LoginError("No se pudo ingresar al sitio, comprueba las credenciales.")
+
+    def get_threads(self, forum):
+        s = self.__session
+        if not isinstance(forum, Forum):
+            raise GeneralError("El parametro debe ser instancia de la clase Forum")
+
+        req = s.get(forum.url)
+        if req.status_code != 200:
+            raise GeneralError("No se pudo conectar a la página.")
+        soup = BeautifulSoup(req.text, 'html.parser')
+        nav = soup.find('div', {'class': 'PageNav'})
+        last_page = nav.find_all('a')[-2]
+        try:
+            last_page = int(last_page.string)
+        except:
+            raise GeneralError("No se puede obtener la última pagina.")
+
+        thread_objects = []
+        for i in range(1, last_page):
+            req = s.get("{0}page-{1}".format(forum.url, i))
+            if req.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(req.text, 'html.parser')
+            links = soup.find_all('a', {'class': 'PreviewTooltip'})
+
+            threads_link = re.compile('^threads/[^(/-/|/#)]+\.(\d+)/$')
+            for link in links:
+                l = link.get('href')
+                match = threads_link.match(l)
+                if l is not None and match:
+                    id = match.group(1)
+                    try:
+                        id = int(id)
+                    except:
+                        continue
+
+                    name = link.string
+                    url = "{0}/{1}".format(self.base_url, l)
+
+                    t = Thread(id=id, name=name, url=url)
+                    thread_objects.append(t)
+        return thread_objects
 
     def get_forums(self):
         s = self.__session
